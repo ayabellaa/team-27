@@ -1,0 +1,48 @@
+import pymc as pm
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load Data
+df = pd.read_excel("/mnt/data/data1.xlsx")
+df.columns = df.columns.str.strip()
+df['Date Survenance'] = pd.to_datetime(df['Date Survenance'], dayfirst=True, errors='coerce')
+df.dropna(subset=['Date Survenance'], inplace=True)
+df['Year Survenance'] = df['Date Survenance'].dt.year
+df['Exercice'] = pd.to_numeric(df['Exercice'], errors='coerce').fillna(0).astype(int)
+df['Règlement'] = pd.to_numeric(df['Règlement'], errors='coerce').fillna(0.0)
+
+# Prepare Data for Bayesian Model
+future_years = 10
+historical_data = df[df['Year Survenance'] < 2014].groupby('Year Survenance')['Règlement'].sum()
+
+with pm.Model() as model:
+    alpha = pm.HalfNormal("alpha", sigma=10)
+    beta = pm.Normal("beta", mu=0, sigma=1)
+    sigma = pm.HalfNormal("sigma", sigma=10)
+
+    year_idx = np.arange(len(historical_data))
+    mu = alpha + beta * year_idx
+
+    observed = pm.Normal("observed", mu=mu, sigma=sigma, observed=historical_data.values)
+
+    # Sampling (Now returns InferenceData)
+    idata = pm.sample(2000, return_inferencedata=True, target_accept=0.9)
+
+# Generate Forecasts
+future_idx = np.arange(len(historical_data), len(historical_data) + future_years)
+with model:
+    posterior_samples = pm.sample_posterior_predictive(idata)
+    
+# Extract Mean Forecast
+future_predictions = posterior_samples.posterior_predictive["observed"].mean(dim=["chain", "draw"])
+
+# Plot Results
+plt.figure(figsize=(10, 5))
+plt.plot(historical_data.index, historical_data.values, label="Historical Data", marker="o")
+plt.plot(range(2014, 2014 + future_years), future_predictions, label="Projected", linestyle="dashed", marker="o")
+plt.xlabel("Year")
+plt.ylabel("Règlement")
+plt.legend()
+plt.title("Bayesian Forecasting of Règlement from 2014 Onward")
+plt.show()
