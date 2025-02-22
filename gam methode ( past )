@@ -1,0 +1,37 @@
+import pandas as pd
+import numpy as np
+from pygam import LinearGAM, s
+
+# Load the data
+df = pd.read_excel("/mnt/data/data1.xlsx", index_col=0)
+
+# Get triangle dimensions
+num_years = df.shape[0]
+
+# Prepare training data
+X_train = []
+y_train = []
+
+for i in range(num_years):
+    for j in range(num_years - i):
+        X_train.append([i, j])  # Accident year & development year
+        y_train.append(df.iloc[i, j])  # Collect corresponding values
+
+X_train = np.array(X_train)
+y_train = np.array(y_train)
+
+# Fit a GAM model
+gam = LinearGAM(s(0) + s(1)).fit(X_train, y_train)
+
+# Predict missing values
+predicted_triangle = df.copy()
+
+for i in range(num_years):
+    for j in range(num_years - i):
+        if predicted_triangle.iloc[i, j] == 0 or np.isnan(predicted_triangle.iloc[i, j]):
+            predicted_triangle.iloc[i, j] = gam.predict([[i, j]])[0]
+
+# Save results
+predicted_triangle.to_excel("/mnt/data/gam_chain_ladder.xlsx")
+
+print("Prediction complete. File saved as gam_chain_ladder.xlsx")
