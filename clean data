@@ -1,0 +1,50 @@
+import pandas as pd 
+import numpy as np
+
+# Load the data
+df = pd.read_excel(r"C:\Users\s\Desktop\Base de Données MATHURANCE.xlsm", sheet_name="BDD")
+
+# Ensure correct column names
+df.columns = df.columns.str.strip()
+
+# Convert 'Date Survenance' to datetime and extract the year
+df['Date Survenance'] = pd.to_datetime(df['Date Survenance'], dayfirst=True, errors='coerce')
+df.dropna(subset=['Date Survenance'], inplace=True)  # Remove rows where conversion failed
+df['Year Survenance'] = df['Date Survenance'].dt.year
+
+# Ensure 'Exercice' and 'Règlement' are the correct types
+df['Exercice'] = pd.to_numeric(df['Exercice'], errors='coerce').fillna(0).astype(int)
+df['Règlement'] = pd.to_numeric(df['Règlement'], errors='coerce').fillna(0.0)
+
+# Get the range of years
+min_year = df['Year Survenance'].min()
+max_year = df['Exercice'].max()
+num_years = max_year - min_year + 1
+
+# Create an empty matrix
+matrix = np.zeros((num_years, num_years))
+
+# Fill the matrix
+for _, row in df.iterrows():
+    i = row['Year Survenance'] - min_year  # Row index
+    j = row['Exercice'] - row['Year Survenance']  # Column index (payment delay)
+    
+    if 0 <= i < num_years and 0 <= j < num_years:  # Ensure valid indices
+        matrix[i, j] += row['Règlement']
+
+# Convert matrix to DataFrame
+columns = [f"Year {i+1}" for i in range(num_years)]
+index = range(min_year, max_year + 1)
+
+matrix_df = pd.DataFrame(matrix, index=index, columns=columns)
+
+# Display the resulting matrix
+print(matrix_df)
+
+# Save to Excel
+matrix_df.to_excel(r"C:\Users\s\Desktop\data1.xlsx", index=True)
+
+
+
+
+
